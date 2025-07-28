@@ -2,7 +2,7 @@ import Category from "../models/categoryModels.js";
 
 export async function insertCategory(req, res) {
   const { category_name, status } = req.body;
-
+  console.log(req.body);
   try {
     const existingCategory = await Category.findOne({ category_name });
 

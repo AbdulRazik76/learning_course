@@ -7,11 +7,11 @@ import {
   FiZap,
   FiCheckCircle
 } from 'react-icons/fi';
-import { UserContext } from '../../context/userContext';
 import { Link } from 'react-router-dom';
 import { PulseLoader } from 'react-spinners';
 import { motion, AnimatePresence } from 'framer-motion';
 import PaymentModal from './PaymentModal';
+import { UserContext } from '../../context/UserContext';
 
 const UserCart = () => {
     const [cart, setCart] = useState([]);
@@ -22,7 +22,9 @@ const UserCart = () => {
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [paymentStatus, setPaymentStatus] = useState(null);
     const { user } = useContext(UserContext);
-    const user_id = user?._id || "685c07d604a1e6a7ca29c366";
+    console.log("user",user);
+    
+    const user_id = user?._id;
 
     useEffect(() => {
         const fetchCart = async () => {
@@ -75,6 +77,11 @@ const UserCart = () => {
             
             if (isSuccess) {
                 setTimeout(() => {
+                    const course_id = [];
+                 cart.map((item,i)=>{
+                    course_id.push(item.course_id)
+                   })
+                   updateCartStatus(course_id)
                     setCart([]);
                     setTotal(0);
                 }, 2000);
@@ -82,9 +89,14 @@ const UserCart = () => {
         }, 3000);
     };
     
-    const updateCartStatus = async()=>{
+    const updateCartStatus = async(course_id)=>{
        try {
-          await axios.post()
+         const response =  await axios.post('http://localhost:5000/api/cart/update-cart',{
+        user_id,
+       course_id
+         });
+         console.log("response",response.data);
+         
        } catch (error) {
         console.log("error : ",error);
         

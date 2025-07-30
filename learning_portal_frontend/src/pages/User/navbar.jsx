@@ -1,8 +1,10 @@
 import { useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Menu as MenuIcon, UserCircle, LogOut, Settings, ShoppingCart, BookOpen } from "lucide-react";
-import { UserContext } from "../../context/userContext";
 import axios from "axios";
+import { UserContext } from "../../context/UserContext";
+import { useSearch } from "../../context/SearchContext";
+
 
 export default function Navbar({ token, handleLogout }) {
     const [userProfileOpen, setUserProfileOpen] = useState(false);
@@ -12,6 +14,8 @@ export default function Navbar({ token, handleLogout }) {
 
     const navOptions = ["home", "courses", "about", "contact"];
     const { user } = useContext(UserContext);
+
+    const {searchCourse,setSearchCourse} = useSearch();
 
     // Fetch cart count when component mounts or when token changes
     useEffect(() => {
@@ -58,15 +62,19 @@ export default function Navbar({ token, handleLogout }) {
 
                     {/* Nav Items */}
                     <div className="hidden xl:flex col-span-6 justify-center space-x-10 text-black font-medium">
-                        {navOptions.map((item, index) => (
+                        {/* {navOptions.map((item, index) => (
                             <span
                                 key={index}
                                 className="cursor-pointer hover:text-gray-600 transition"
                             >
                                 {item.toUpperCase()}
                             </span>
-                        ))}
+                        ))} */}
+
+                    <input placeholder="Search Courses" value={searchCourse} onChange={(e)=>setSearchCourse(e.target.value)} />
+
                     </div>
+
 
                     {/* Desktop User Profile / Login */}
                     <div className="hidden xl:flex col-span-3 justify-end items-center space-x-4">

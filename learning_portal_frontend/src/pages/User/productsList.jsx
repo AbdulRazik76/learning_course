@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { FiX, FiCreditCard, FiCheckCircle, FiAlertCircle } from "react-icons/fi";
 import PulseLoader from "react-spinners/PulseLoader";
 import { useNavigate } from "react-router-dom";
+import { useSearch } from "../../context/SearchContext";
 
 export default function ProductsList({ user }) {
   const [courses, setCourses] = useState([]);
@@ -14,8 +15,10 @@ export default function ProductsList({ user }) {
   const [paymentStatus, setPaymentStatus] = useState("processing");
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [filteredCourses,setFilteredCourses]=useState([])
   const intervalRefs = useRef({});
   const navigate = useNavigate();
+  const {searchCourse,setSearchCourse} =useSearch();
 
   useEffect(() => {
     fetchCourse();
@@ -24,34 +27,50 @@ export default function ProductsList({ user }) {
         clearInterval(interval);
       });
     };
-  }, []);
+  }, [user?._id]);
 
-  const fetchCourse = async () => {
-    try {
-      const response = await axios.post('http://localhost:5000/api/course/get-course-user', {
-        user_id: user?._id || "685c07d604a1e6a7ca29c366"
-      });
-      const courseList = response.data.getCourse;
-        
+  useEffect(()=>{
+     const newCourses = courses.filter((item)=>
+     item.name.toLowerCase().includes(searchCourse.toLowerCase()) 
+     )
+     setFilteredCourses(newCourses)
+  },[searchCourse])
+
+ const fetchCourse = async () => {
+  try {
+    // Reset state before fetching
+    setCourses([]);
+    setCurrentIndices({});
+    
+    const response = await axios.post('http://localhost:5000/api/course/get-course-user', {
+      user_id: user?._id,
+    });
+    
+    const courseList = response.data.getCourse;
+
+    if (courseList) {
+      setCourses(courseList);
+      setFilteredCourses(courseList)
       
-      if (courseList) {
-        setCourses(courseList);
-        const indices = {};
-        courseList.forEach((course, index) => {
-          indices[index] = 0;
-        });
-        setCurrentIndices(indices);
-        courseList.forEach((course, index) => {
-          if (course.images && course.images.length > 1) {
-            startAutoSlide(courseList, index);
-          }
-        });
-      }
-    } catch (err) {
-      toast.error("Error while fetching courses");
-      console.error("Fetch Course Error:", err);
+      // Initialize indices
+      const indices = {};
+      courseList.forEach((course, index) => {
+        indices[index] = 0;
+      });
+      setCurrentIndices(indices);
+      
+      // Start auto-slide for courses with multiple images
+      courseList.forEach((course, index) => {
+        if (course.images && course.images.length > 1) {
+          startAutoSlide(courseList, index);
+        }
+      });
     }
-  };
+  } catch (err) {
+    toast.error("Error while fetching courses");
+    console.error("Fetch Course Error:", err);
+  }
+};
 
   const startAutoSlide = (courseList, productIndex) => {
     if (intervalRefs.current[productIndex]) {
@@ -79,9 +98,9 @@ export default function ProductsList({ user }) {
   const prevImage = (productIndex) => {
     setCurrentIndices(prev => ({
       ...prev,
-      [productIndex]: 
-        prev[productIndex] === 0 
-          ? courses[productIndex].images.length - 1 
+      [productIndex]:
+        prev[productIndex] === 0
+          ? courses[productIndex].images.length - 1
           : prev[productIndex] - 1
     }));
     if (courses[productIndex]?.images.length > 1) {
@@ -101,7 +120,9 @@ export default function ProductsList({ user }) {
     }
   };
 
-  const addToCart = async(id) => {
+  const addToCart = async (id) => {
+    console.log("add to cart");
+
     try {
       const response = await axios.post(`http://localhost:5000/api/cart/insert-cart`, {
         user_id: user._id,
@@ -111,7 +132,7 @@ export default function ProductsList({ user }) {
         toast.success("Course added to cart successfully");
         fetchCourse(); // Refresh the course list to update status
       }
-    } catch(err) {
+    } catch (err) {
       toast.error("Error adding to cart");
       console.error(err);
     }
@@ -128,22 +149,40 @@ export default function ProductsList({ user }) {
     setIsProcessingPayment(false);
   };
 
-  const simulatePayment = () => {
+  const simulatePayment = async () => {
+    if (!selectedCourse || !selectedCourse._id) {
+      console.error("Course not selected");
+      return;
+    }
+
     setIsProcessingPayment(true);
-    setTimeout(() => {
+
+    setTimeout(async () => {
       const isSuccess = Math.random() > 0.3;
       setPaymentStatus(isSuccess ? "success" : "failed");
+
       if (isSuccess) {
-        handleBuy(selectedCourse._id);
+        try {
+          await addToCart(selectedCourse._id);
+          await handleBuy(selectedCourse._id);
+        } catch (error) {
+          console.error("Error processing purchase:", error);
+          setPaymentStatus("failed");
+        }
       }
+
+      setIsProcessingPayment(false);
     }, 2000);
   };
 
-  const handleBuy = async(id) => {
+
+  const handleBuy = async (id) => {
+    console.log("handle buy");
+
     try {
-      await axios.post('http://localhost:5000/api/user-course/insert-user-course', {
+      await axios.post('http://localhost:5000/api/cart/update-cart', {
         user_id: user._id,
-        course_id: id
+        course_id: [id]
       });
       fetchCourse(); // Refresh the course list to update status
     } catch (error) {
@@ -152,7 +191,7 @@ export default function ProductsList({ user }) {
   };
 
   const navigateToCourseDetails = (courseId) => {
-    localStorage.setItem('course_id',courseId)
+    localStorage.setItem('course_id', courseId)
     navigate(`/course`);
   };
 
@@ -164,7 +203,7 @@ export default function ProductsList({ user }) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 px-4 mt-6 max-w-7xl mx-auto">
-        {courses.map((item, index) => (
+        {filteredCourses.map((item, index) => (
           <div key={index} className="bg-white shadow-xl rounded-xl overflow-hidden relative group">
             {/* Status badge */}
             {item.status === 1 && (
@@ -179,22 +218,21 @@ export default function ProductsList({ user }) {
             )}
 
             {/* Image Slider Container */}
-            <div 
+            <div
               className="relative h-48 w-full overflow-hidden"
               onMouseEnter={() => handleSliderHover(index)}
               onMouseLeave={() => handleSliderLeave(index)}
             >
-              <img 
-  src={`http://localhost:5000/${
-    item.images[currentIndices[index]].replace(/^\/?/, '')
-  }`} 
-  className="h-full w-full object-cover" 
-  alt={item.name}
-/>
-              
+              <img
+                src={`http://localhost:5000/${item.images[currentIndices[index]].replace(/^\/?/, '')
+                  }`}
+                className="h-full w-full object-cover"
+                alt={item.name}
+              />
+
               {item.images.length > 1 && (
                 <>
-                  <button 
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
                       prevImage(index);
@@ -203,7 +241,7 @@ export default function ProductsList({ user }) {
                   >
                     <FaChevronLeft />
                   </button>
-                  <button 
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
                       nextImage(index);
@@ -214,11 +252,11 @@ export default function ProductsList({ user }) {
                   </button>
                 </>
               )}
-              
+
               {item.images.length > 1 && (
                 <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
                   {item.images.map((_, imgIndex) => (
-                    <div 
+                    <div
                       key={imgIndex}
                       className={`w-2 h-2 rounded-full ${currentIndices[index] === imgIndex ? 'bg-white' : 'bg-white bg-opacity-50'}`}
                     />
@@ -226,7 +264,7 @@ export default function ProductsList({ user }) {
                 </div>
               )}
             </div>
-            
+
             <div className="p-6">
               <p className="text-xl font-semibold">{item.name}</p>
               <p className="font-semibold mt-2">${item.price}</p>
@@ -235,7 +273,7 @@ export default function ProductsList({ user }) {
               {user ? (
                 <div className="flex gap-x-2 mt-4">
                   {item.status === 1 ? (
-                    <button 
+                    <button
                       onClick={() => navigateToCourseDetails(item._id)}
                       className="bg-green-100 text-green-800 h-10 w-full rounded-md hover:bg-green-200 transition-colors flex items-center justify-center gap-2"
                     >
@@ -243,7 +281,7 @@ export default function ProductsList({ user }) {
                     </button>
                   ) : (
                     <>
-                      <button 
+                      <button
                         onClick={() => openPaymentModal(item)}
                         className="bg-black text-white h-10 w-28 rounded-md cursor-pointer hover:bg-gray-800 transition-colors"
                         disabled={item.status === 0}
@@ -252,11 +290,10 @@ export default function ProductsList({ user }) {
                       </button>
                       <button
                         onClick={() => item.status !== 0 && addToCart(item._id)}
-                        className={`h-10 w-28 rounded-md border-2 flex items-center justify-center gap-2 ${
-                          item.status === 0 
+                        className={`h-10 w-28 rounded-md border-2 flex items-center justify-center gap-2 ${item.status === 0
                             ? "bg-blue-50 border-blue-200 text-blue-800 cursor-default"
                             : "border-black hover:bg-gray-50 cursor-pointer"
-                        }`}
+                          }`}
                       >
                         {item.status === 0 ? (
                           <>
@@ -284,13 +321,13 @@ export default function ProductsList({ user }) {
       {/* Payment Modal */}
       <AnimatePresence>
         {showPaymentModal && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black/70 bg-opacity-50 flex items-center justify-center z-50 p-4"
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -299,11 +336,11 @@ export default function ProductsList({ user }) {
               <div className="p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-xl font-bold text-gray-800">
-                    {paymentStatus === 'processing' ? 'Complete Payment' : 
-                     paymentStatus === 'success' ? 'Payment Successful' : 'Payment Failed'}
+                    {paymentStatus === 'processing' ? 'Complete Payment' :
+                      paymentStatus === 'success' ? 'Payment Successful' : 'Payment Failed'}
                   </h3>
-                  <button 
-                    onClick={closePaymentModal} 
+                  <button
+                    onClick={closePaymentModal}
                     className="text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <FiX size={24} />
@@ -316,8 +353,8 @@ export default function ProductsList({ user }) {
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="grid grid-cols-5 gap-1 p-4">
                           {Array(25).fill(0).map((_, i) => (
-                            <div 
-                              key={i} 
+                            <div
+                              key={i}
                               className={`w-5 h-5 rounded-sm ${Math.random() > 0.3 ? 'bg-blue-600' : 'bg-white'}`}
                             />
                           ))}
@@ -333,7 +370,7 @@ export default function ProductsList({ user }) {
                     <PulseLoader color="#3B82F6" size={10} />
                     <p className="mt-4 text-sm text-gray-500">Processing payment...</p>
                     {!isProcessingPayment && (
-                      <motion.button 
+                      <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={simulatePayment}
@@ -346,7 +383,7 @@ export default function ProductsList({ user }) {
                 )}
 
                 {paymentStatus === 'success' && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="text-center py-6"
@@ -370,7 +407,7 @@ export default function ProductsList({ user }) {
                         <span>${selectedCourse?.price}</span>
                       </div>
                     </div>
-                    <motion.button 
+                    <motion.button
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => {
@@ -385,7 +422,7 @@ export default function ProductsList({ user }) {
                 )}
 
                 {paymentStatus === 'failed' && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="text-center py-6"
@@ -400,7 +437,7 @@ export default function ProductsList({ user }) {
                       We couldn't process your payment for "{selectedCourse?.name}". Please try again or use a different payment method.
                     </p>
                     <div className="flex gap-3">
-                      <motion.button 
+                      <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => setPaymentStatus('processing')}
@@ -408,7 +445,7 @@ export default function ProductsList({ user }) {
                       >
                         Try Again
                       </motion.button>
-                      <motion.button 
+                      <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={closePaymentModal}

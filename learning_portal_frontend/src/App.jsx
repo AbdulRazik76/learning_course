@@ -19,6 +19,7 @@ import UserCart from './pages/User/UserCart'
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import CourseDetails from './pages/User/CourseDetails'
+import { SearchProvider } from './context/SearchContext'
 
 
 
@@ -34,7 +35,8 @@ function App() {
         {/* Commented routes and router example  */}
         <ToastContainer />
         <ThemeProvider>
-          <Router>
+        <SearchProvider>
+                    <Router>
             <Routes>
               <Route path='/' element={<Login />} />
               <Route path='/home' element={<Home />} />
@@ -51,6 +53,7 @@ function App() {
               </Route>
             </Routes>
           </Router>
+        </SearchProvider>
         </ThemeProvider>
        
       </div>
